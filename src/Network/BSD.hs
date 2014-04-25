@@ -44,6 +44,8 @@ module Network.BSD(
 import Control.Exception
 import Data.Typeable
 import Foreign.C.Types
+import Hans.Address.IP4
+import Network.BSD.ServiceDB
 import Network.Socket.Internal
 
 type HostName = String
@@ -80,38 +82,43 @@ getHostEntry  = undefined
 endHostEntry :: IO ()
 endHostEntry  = return ()
 
-data ServiceEntry = ServiceEntry {
-    serviceName     :: ServiceName
-  , serviceAliases  :: [ServiceName]
-  , servicePort     :: PortNumber
-  , serviceProtocol :: ProtocolName
-  }
- deriving (Show, Typeable)
-
-type ServiceName = String
-
 getServiceByName :: ServiceName -> ProtocolName -> IO ServiceEntry
-getServiceByName  = undefined
+getServiceByName sn pn = return (go serviceDB)
+ where
+  go [] = throw (userError "Service not found.")
+  go (f:rest)
+    | nameMatches f && (serviceProtocol f == pn) = f
+    | otherwise                                  = go rest
+  --
+  nameMatches x = (serviceName x == sn) || (sn `elem` serviceAliases x)
 
 getServiceByPort :: PortNumber -> ProtocolName -> IO ServiceEntry
-getServiceByPort  = undefined
+getServiceByPort po pr = return (go serviceDB)
+ where
+  go [] = throw (userError "Service not found.")
+  go (f:rest)
+    | (servicePort f == po) && (serviceProtocol f == pr) = f
+    | otherwise                                          = go rest
 
 getServicePortNumber :: ServiceName -> IO PortNumber
-getServicePortNumber  = undefined
+getServicePortNumber sn = return (go serviceDB)
+ where
+  go [] = throw (userError "Service not found.")
+  go (f:rest)
+    | (serviceName f == sn) || (sn `elem` serviceAliases f) = servicePort f
+    | otherwise                                             = go rest
 
 getServiceEntries :: Bool -> IO [ServiceEntry]
-getServiceEntries  = undefined
+getServiceEntries _ = return serviceDB
 
 getServiceEntry :: IO ServiceEntry
-getServiceEntry  = undefined
+getServiceEntry  = return (head serviceDB)
 
 setServiceEntry :: Bool -> IO ()
-setServiceEntry _ = undefined
+setServiceEntry _ = return ()
 
 endServiceEntry :: IO ()
 endServiceEntry  = return ()
-
-type ProtocolName = String
 
 type ProtocolNumber = CInt
 
@@ -174,20 +181,38 @@ data NetworkEntry = NetworkEntry {
   }
  deriving (Read, Show, Typeable)
 
+networkDB :: [NetworkEntry]
+networkDB  = [
+    NetworkEntry "default"    [] AF_INET 0
+  , NetworkEntry "loopback"   [] AF_INET (convertToWord32' (IP4 127 0 0 0))
+  , NetworkEntry "link-local" [] AF_INET (convertToWord32' (IP4 169 254 0 0))
+  ]
+ where convertToWord32' = fromIntegral . convertToWord32
+
 getNetworkByName :: NetworkName -> IO NetworkEntry
-getNetworkByName  = undefined
+getNetworkByName nm = return (go networkDB)
+ where
+  go [] = throw (userError "Network not found")
+  go (first:rest)
+    | (networkName first == nm) || (nm `elem` networkAliases first) = first
+    | otherwise                                                     = go rest
 
 getNetworkByAddr :: NetworkAddr -> Family -> IO NetworkEntry
-getNetworkByAddr  = undefined
+getNetworkByAddr addr fam = return (go networkDB)
+ where
+  go [] = throw (userError "Network not found")
+  go (first:rest)
+    | (networkFamily first == fam) && (networkAddress first == addr) = first
+    | otherwise                                                      = go rest
 
 getNetworkEntries :: Bool -> IO [NetworkEntry]
-getNetworkEntries  = undefined
+getNetworkEntries _ = return networkDB
 
 setNetworkEntry :: Bool -> IO ()
 setNetworkEntry _ = return ()
 
 getNetworkEntry :: IO NetworkEntry
-getNetworkEntry  = undefined
+getNetworkEntry = return (head networkDB)
 
 endNetworkEntry :: IO ()
 endNetworkEntry = return ()

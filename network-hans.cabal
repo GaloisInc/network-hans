@@ -30,6 +30,8 @@ library
                                         Network.Socket.ByteString.Lazy,
                                         Network.Socket.Internal,
                                         Network.URI
+        other-modules:
+                                        Network.BSD.ServiceDB
 
         build-depends:
                                         base       >= 4.0 && < 5.0,
