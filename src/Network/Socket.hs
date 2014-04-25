@@ -75,22 +75,20 @@ import qualified Network.Socket.ByteString.Lazy as SL
 import System.IO
 
 isSupportedFamily :: Family -> Bool
-isSupportedFamily  = undefined
+isSupportedFamily AF_INET = True
+isSupportedFamily _       = False
 
 data SocketType = NoSocketType
                 | Stream
                 | Datagram
+                | Raw
+                | RDM
+                | SeqPacket
   deriving (Eq, Ord, Read, Show, Typeable)
 
 isSupportedSocketType :: SocketType -> Bool
-isSupportedSocketType  = undefined
-
-data SocketStatus = NotConnected
-                  | Bound
-                  | Listening
-                  | Connected
-                  | ConvertedToHandle
-                  | Closed
+isSupportedSocketType Stream   = True
+isSupportedSocketType Datagram = True
 
 data ShutdownCmd = ShutdownReceive | ShutdownSend | ShutdownBoth
   deriving (Typeable)
@@ -122,7 +120,7 @@ addrInfoFlagImplemented :: AddrInfoFlag -> Bool
 addrInfoFlagImplemented _ = False
 
 defaultHints :: AddrInfo
-defaultHints  = undefined
+defaultHints  = AddrInfo [] AF_UNSPEC NoSocketType 0 undefined undefined
 
 getAddrInfo :: Maybe AddrInfo -> Maybe HostName -> Maybe ServiceName ->
                IO [AddrInfo]
@@ -137,7 +135,7 @@ getNameInfo :: [NameInfoFlag] -> Bool -> Bool -> SockAddr ->
 getNameInfo  = undefined
 
 socket :: Family -> SocketType -> ProtocolNumber -> IO Socket
-socket  = undefined
+socket AF_INET Stream _ = undefined
 
 socketPair :: Family -> SocketType -> ProtocolNumber -> IO (Socket, Socket)
 socketPair  = undefined

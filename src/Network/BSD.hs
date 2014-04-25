@@ -41,9 +41,9 @@ module Network.BSD(
        )
  where
 
+import Control.Exception
 import Data.Typeable
 import Foreign.C.Types
-import Foreign.Storable
 import Network.Socket.Internal
 
 type HostName = String
@@ -72,13 +72,13 @@ getHostEntries :: Bool -> IO [HostEntry]
 getHostEntries  = undefined
 
 setHostEntry :: Bool -> IO ()
-setHostEntry  = undefined
+setHostEntry _ = return ()
 
 getHostEntry :: IO HostEntry
 getHostEntry  = undefined
 
 endHostEntry :: IO ()
-endHostEntry  = undefined
+endHostEntry  = return ()
 
 data ServiceEntry = ServiceEntry {
     serviceName     :: ServiceName
@@ -87,12 +87,6 @@ data ServiceEntry = ServiceEntry {
   , serviceProtocol :: ProtocolName
   }
  deriving (Show, Typeable)
-
-instance Storable ServiceEntry where
-  sizeOf _ = undefined
-  alignment _ = undefined
-  peek _ = undefined
-  poke _ = undefined
 
 type ServiceName = String
 
@@ -112,10 +106,10 @@ getServiceEntry :: IO ServiceEntry
 getServiceEntry  = undefined
 
 setServiceEntry :: Bool -> IO ()
-setServiceEntry  = undefined
+setServiceEntry _ = undefined
 
 endServiceEntry :: IO ()
-endServiceEntry  = undefined
+endServiceEntry  = return ()
 
 type ProtocolName = String
 
@@ -128,35 +122,45 @@ data ProtocolEntry = ProtocolEntry {
   }
  deriving (Read, Show, Typeable)
 
-instance Storable ProtocolEntry where
-  sizeOf _ = undefined
-  alignment _ = undefined
-  peek _ = undefined
-  poke _ = undefined
+protocolDB :: [ProtocolEntry]
+protocolDB = [
+    ProtocolEntry "udp" ["UDP"] 17
+  , ProtocolEntry "tcp" ["TCP"] 6
+  ]
 
 getProtocolByName :: ProtocolName -> IO ProtocolEntry
-getProtocolByName  = undefined
+getProtocolByName nm = return (go protocolDB)
+ where
+  go [] = throw (userError "Protocol not found")
+  go (first:rest)
+    | (protoName first == nm) || (nm `elem` protoAliases first) = first
+    | otherwise                                                 = go rest
 
 getProtocolByNumber :: ProtocolNumber -> IO ProtocolEntry
-getProtocolByNumber  = undefined
+getProtocolByNumber num = return (go protocolDB)
+ where
+  go [] = throw (userError "Protocol not found")
+  go (first:rest)
+    | protoNumber first == num = first
+    | otherwise                = go rest
 
 getProtocolNumber :: ProtocolName -> IO ProtocolNumber
-getProtocolNumber  = undefined
+getProtocolNumber name = protoNumber `fmap` (getProtocolByName name)
 
 defaultProtocol :: ProtocolNumber
-defaultProtocol  = undefined
+defaultProtocol = 0
 
 getProtocolEntries :: Bool -> IO [ProtocolEntry]
-getProtocolEntries  = undefined
+getProtocolEntries _ = return protocolDB
 
 setProtocolEntry :: Bool -> IO ()
-setProtocolEntry  = undefined
+setProtocolEntry _ = return ()
 
 getProtocolEntry :: IO ProtocolEntry
-getProtocolEntry  = undefined
+getProtocolEntry = return (head protocolDB)
 
 endProtocolEntry :: IO ()
-endProtocolEntry  = undefined
+endProtocolEntry = return ()
 
 type NetworkName = String
 
@@ -170,12 +174,6 @@ data NetworkEntry = NetworkEntry {
   }
  deriving (Read, Show, Typeable)
 
-instance Storable NetworkEntry where
-  sizeOf _ = undefined
-  alignment _ = undefined
-  peek _ = undefined
-  poke _ = undefined
-
 getNetworkByName :: NetworkName -> IO NetworkEntry
 getNetworkByName  = undefined
 
@@ -186,10 +184,10 @@ getNetworkEntries :: Bool -> IO [NetworkEntry]
 getNetworkEntries  = undefined
 
 setNetworkEntry :: Bool -> IO ()
-setNetworkEntry  = undefined
+setNetworkEntry _ = return ()
 
 getNetworkEntry :: IO NetworkEntry
 getNetworkEntry  = undefined
 
 endNetworkEntry :: IO ()
-endNetworkEntry  = undefined
+endNetworkEntry = return ()
