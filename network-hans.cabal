@@ -22,7 +22,10 @@ source-repository head
 library
         hs-source-dirs:                 src
         extensions:                     DeriveDataTypeable,
-                                        GeneralizedNewtypeDeriving
+                                        ForeignFunctionInterface,
+                                        GeneralizedNewtypeDeriving,
+                                        RecordWildCards,
+                                        ScopedTypeVariables
         exposed-modules:
                                         Network.BSD,
                                         Network.Socket,

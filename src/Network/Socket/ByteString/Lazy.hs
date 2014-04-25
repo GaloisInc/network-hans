@@ -15,7 +15,8 @@ import Prelude hiding (getContents)
 import System.IO.Unsafe(unsafeInterleaveIO)
 
 send :: Socket -> ByteString -> IO Int64
-send sock bstr = getConnectedHansSocket sock >>= (\ s -> NS.sendBytes s bstr)
+send sock bstr = getConnectedHansSocket sock ForWrite >>=
+  (\ s -> NS.sendBytes s bstr)
 
 sendAll :: Socket -> ByteString -> IO ()
 sendAll sock bstr
@@ -36,5 +37,6 @@ getContents socket = lazyRead
                   return (bstr `L.append` next)
 
 recv :: Socket -> Int64 -> IO ByteString
-recv sock amt = getConnectedHansSocket sock >>= (\ s -> NS.recvBytes s amt)
+recv sock amt = getConnectedHansSocket sock ForRead >>=
+  (\ s -> NS.recvBytes s amt)
 

@@ -19,12 +19,10 @@ module Network.BSD(
        , setServiceEntry
        , endServiceEntry
        , ProtocolName
-       , ProtocolNumber
-       , ProtocolEntry
+       , ProtocolEntry(..)
        , getProtocolByName
        , getProtocolByNumber
        , getProtocolNumber
-       , defaultProtocol
        , getProtocolEntries
        , setProtocolEntry
        , getProtocolEntry
@@ -120,8 +118,6 @@ setServiceEntry _ = return ()
 endServiceEntry :: IO ()
 endServiceEntry  = return ()
 
-type ProtocolNumber = CInt
-
 data ProtocolEntry = ProtocolEntry {
     protoName    :: ProtocolName
   , protoAliases :: [ProtocolName]
@@ -153,9 +149,6 @@ getProtocolByNumber num = return (go protocolDB)
 
 getProtocolNumber :: ProtocolName -> IO ProtocolNumber
 getProtocolNumber name = protoNumber `fmap` (getProtocolByName name)
-
-defaultProtocol :: ProtocolNumber
-defaultProtocol = 0
 
 getProtocolEntries :: Bool -> IO [ProtocolEntry]
 getProtocolEntries _ = return protocolDB

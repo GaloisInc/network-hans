@@ -1,6 +1,24 @@
 module Network.Socket.Internal(
          Socket(..)
        , SocketStatus(..)
+       , socket
+       , connect
+       , bind
+       , listen
+       , accept
+       , ShutdownCmd(..)
+       , close
+       , shutdown
+       , isConnected
+       , isBound
+       , isListening
+       , isReadable
+       , isWritable
+       , SocketType(..)
+       , isSupportedSocketType
+       , ProtocolNumber
+       , defaultProtocol
+       , ForAction(..)
        , getConnectedHansSocket
        , getBoundUdpPort
        , getNextUdpPacket
@@ -12,20 +30,30 @@ module Network.Socket.Internal(
        , HostAddress6
        , getNetworkHansStack
        , setNetworkHansStack
+       , getNextSockIdent
        )
  where
 
 import Control.Concurrent.Chan
 import Control.Concurrent.MVar
 import Control.Exception
+import Control.Monad
 import Data.Typeable
 import Data.ByteString(ByteString)
 import Data.Word(Word64, Word32,Word16)
+import Foreign.C.Types
 import Foreign.Storable
 import Hans.Address.IP4
+import Hans.Message.Tcp(getPort)
+import Hans.Message.Udp(getUdpPort)
 import Hans.NetworkStack(NetworkStack)
 import qualified Hans.NetworkStack as NS
 import System.IO.Unsafe
+
+type ProtocolNumber = CInt
+
+defaultProtocol :: ProtocolNumber
+defaultProtocol = 6
 
 data Socket = Socket {
     sockState  :: MVar SockState
@@ -33,12 +61,33 @@ data Socket = Socket {
   , sockIdent  :: Word64
   }
 
-getConnectedHansSocket :: Socket -> IO NS.Socket
-getConnectedHansSocket sock =
+data ForAction = ForNeither | ForRead | ForWrite | ForBoth
+  deriving (Eq)
+
+getConnectedHansSocket :: Socket -> ForAction -> IO NS.Socket
+getConnectedHansSocket sock forWrite =
   do state <- readMVar (sockState sock)
      case state of
-       SockConnected s -> return s
-       _               -> throw (userError "Socket not in connected state.")
+       SockConnected s c -> checkDone c forWrite >> return s
+       _                 -> throw (userError "Socket not in connected state.")
+ where
+  checkDone Nothing _ =
+           return ()
+  checkDone (Just ShutdownReceive) x
+    | x `elem` [ForRead, ForBoth] =
+           throw (userError "Read on Socket set shutdown/receive.")
+    | otherwise =
+           return ()
+  checkDone (Just ShutdownSend) x
+    | x `elem` [ForWrite, ForBoth] =
+           throw (userError "Write on Socket set shutdown/send.")
+    | otherwise =
+           return ()
+  checkDone (Just ShutdownBoth) x
+    | x /= ForNeither =
+           throw (userError "Read or write on shutdown socket.")
+    | otherwise =
+           return ()
 
 getBoundUdpPort :: Socket -> IO (NetworkStack, Maybe NS.UdpPort)
 getBoundUdpPort sock =
@@ -65,9 +114,177 @@ data SocketStatus = NotConnected
                   | Closed
  deriving (Eq, Show)
 
-data SockState = SockInitial
-               | SockConnected NS.Socket
+data SocketType = NoSocketType
+                | Stream
+                | Datagram
+                | Raw
+                | RDM
+                | SeqPacket
+  deriving (Eq, Ord, Read, Show, Typeable)
+
+isSupportedSocketType :: SocketType -> Bool
+isSupportedSocketType Stream   = True
+isSupportedSocketType Datagram = True
+
+data SockState = SockInitialUdp
+               | SockInitialTcp
+               | SockConnected NS.Socket (Maybe ShutdownCmd)
                | SockBoundUdp (Maybe NS.UdpPort) (Chan (ByteString, SockAddr))
+               | SockBoundTcp IP4 NS.TcpPort
+               | SockListening NS.Socket
+               | SockClosed
+
+instance Eq SockState where
+  SockInitialTcp == SockInitialTcp = True
+  SockInitialUdp == SockInitialUdp = True
+  SockClosed     == SockClosed     = True
+  _              == _              = False
+
+socket :: Family -> SocketType -> ProtocolNumber -> IO Socket
+socket AF_INET Stream   6  =
+  do sockState  <- newMVar SockInitialTcp
+     sockNStack <- getNetworkHansStack
+     sockIdent  <- getNextSockIdent
+     return Socket { .. }
+socket AF_INET Datagram 17 =
+  do sockState  <- newMVar SockInitialUdp
+     sockNStack <- getNetworkHansStack
+     sockIdent  <- getNextSockIdent
+     return Socket { .. }
+socket _       _        _  =
+  throw (userError "ERROR: Unsupported socket options.")
+
+connect :: Socket -> SockAddr -> IO ()
+connect sock (SockAddrInet (PortNum port) addr) =
+  do state <- takeMVar (sockState sock)
+     unless (state == SockInitialTcp) $
+       throw (userError "Attempt to connect() on a non-TCP socket.")
+     let dest  = convertFromWord32 addr
+         dport = fromIntegral port
+         ns    = sockNStack sock
+     catch (do hsock <- NS.connect ns dest dport Nothing
+               putMVar (sockState sock) (SockConnected hsock Nothing))
+           (\ e ->
+             do putMVar (sockState sock) state
+                throw (e :: SomeException))
+
+bind :: Socket -> SockAddr -> IO ()
+bind sock (SockAddrInet (PortNum port) addr) =
+  do state <- takeMVar (sockState sock)
+     case state of
+       SockInitialUdp ->
+         do chan <- newChan
+            let port' = fromIntegral port
+            NS.addUdpHandler (sockNStack sock) port' (udpHandler chan)
+            let state' = SockBoundUdp (Just port') chan
+            putMVar (sockState sock) state'
+       SockInitialTcp ->
+         do let port' = fromIntegral port
+                addr' = convertFromWord32 addr
+            putMVar (sockState sock) (SockBoundTcp addr' port')
+       _ ->
+         do putMVar (sockState sock) state
+            throw (userError "Bind called on incompatible socket.")
+ where
+  udpHandler :: Chan (ByteString, SockAddr) -> IP4 -> NS.UdpPort -> ByteString -> IO ()
+  udpHandler chan addr port bstr =
+    let sport = PortNum (fromIntegral (getUdpPort port))
+        saddr = convertToWord32 addr
+    in writeChan chan (bstr, SockAddrInet sport saddr)
+
+listen :: Socket -> Int -> IO ()
+listen sock _ =
+  do state <- takeMVar (sockState sock)
+     case state of
+       SockBoundTcp addr port ->
+         do nsock <- NS.listen (sockNStack sock) addr port
+            putMVar (sockState sock) (SockListening nsock)
+       _ ->
+         throw (userError "Listen called on unbound or non-TCP socket.")
+
+accept :: Socket -> IO (Socket, SockAddr)
+accept sock =
+  do state <- readMVar (sockState sock)
+     case state of
+       SockListening lsock ->
+         do newsock <- NS.accept lsock
+            state   <- newMVar (SockConnected newsock Nothing)
+            newid   <- getNextSockIdent
+            let sock' = Socket state (sockNStack sock) newid
+                oaddr = convertToWord32 (NS.sockRemoteHost newsock)
+                oport = fromIntegral (getPort (NS.sockRemotePort newsock))
+            return (sock', SockAddrInet oport oaddr)
+
+data ShutdownCmd = ShutdownReceive | ShutdownSend | ShutdownBoth
+  deriving (Typeable, Eq)
+
+shutdown :: Socket -> ShutdownCmd -> IO ()
+shutdown so cmd =
+  do state <- takeMVar (sockState so)
+     case state of
+       SockConnected sock oshtd ->
+         do let shtd = advanceShutdown oshtd cmd
+            if shtd == ShutdownBoth
+               then do putMVar (sockState so) SockClosed
+                       NS.close sock
+               else putMVar (sockState so) (SockConnected sock (Just shtd))
+
+advanceShutdown :: Maybe ShutdownCmd -> ShutdownCmd -> ShutdownCmd
+advanceShutdown Nothing                x               = x
+advanceShutdown _                      ShutdownBoth    = ShutdownBoth
+advanceShutdown (Just ShutdownReceive) ShutdownSend    = ShutdownBoth
+advanceShutdown (Just ShutdownSend)    ShutdownReceive = ShutdownBoth
+advanceShutdown (Just y)               x               = y
+
+close :: Socket -> IO ()
+close so =
+  do state <- takeMVar (sockState so)
+     case state of
+       SockConnected sock       _ -> NS.close sock
+       SockBoundUdp (Just port) _ -> NS.removeUdpHandler (sockNStack so) port
+       SockListening sock         -> NS.close sock
+       _                          -> return ()
+     putMVar (sockState so) SockClosed
+
+isConnected :: Socket -> IO Bool
+isConnected so =
+  do state <- readMVar (sockState so)
+     case state of
+       SockConnected _ _ -> return True
+       _                 -> return False
+
+isBound :: Socket -> IO Bool
+isBound so =
+  do state <- readMVar (sockState so)
+     case state of
+       SockBoundUdp _ _ -> return True
+       SockBoundTcp _ _ -> return True
+       _                -> return False
+
+isListening :: Socket -> IO Bool
+isListening so =
+  do state <- readMVar (sockState so)
+     case state of
+       SockListening _ -> return True
+       _               -> return False
+
+isReadable :: Socket -> IO Bool
+isReadable so =
+  do state <- readMVar (sockState so)
+     case state of
+       SockBoundUdp _ _                       -> return True
+       SockConnected _ (Just ShutdownReceive) -> return False
+       SockConnected _ _                      -> return  True
+       _                                      -> return False
+
+isWritable :: Socket -> IO Bool
+isWritable so = 
+  do state <- readMVar (sockState so)
+     case state of
+       SockBoundUdp _ _                    -> return True
+       SockConnected _ (Just ShutdownSend) -> return False
+       SockConnected _ _                   -> return  True
+       _                                   -> return False
 
 data SockAddr = SockAddrInet PortNumber HostAddress
  deriving (Eq, Ord, Show, Typeable)
@@ -165,4 +382,11 @@ getNetworkHansStack = readMVar evilNSMVar
 
 setNetworkHansStack :: NetworkStack -> IO ()
 setNetworkHansStack ns = swapMVar evilNSMVar ns >> return ()
+
+{-# NOINLINE evilSockIdentMVar #-}
+evilSockIdentMVar :: MVar Word64
+evilSockIdentMVar = unsafePerformIO (newMVar 0)
+
+getNextSockIdent :: IO Word64
+getNextSockIdent  = modifyMVar evilSockIdentMVar (\ x -> return (x + 1, x))
 
