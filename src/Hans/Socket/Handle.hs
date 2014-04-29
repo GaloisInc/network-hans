@@ -52,16 +52,16 @@ instance IODevice BufferedSocket where
   close bs     = dropRef bs
   isTerminal _ = return False
   isSeekable _ = return False
-  seek _ _ _   = throw (userError "Seek on HaNS socket.")
-  tell _       = throw (userError "Tell on HaNS socket.")
-  getSize _    = throw (userError "getSize on HaNS socket.")
-  setSize _ _  = throw (userError "setSize on HaNS socket.")
-  setEcho _ _  = throw (userError "setEcho on HaNS socket.")
-  getEcho _    = throw (userError "getEcho on HaNS socket.")
+  seek _ _ _   = throwIO (userError "Seek on HaNS socket.")
+  tell _       = throwIO (userError "Tell on HaNS socket.")
+  getSize _    = throwIO (userError "getSize on HaNS socket.")
+  setSize _ _  = throwIO (userError "setSize on HaNS socket.")
+  setEcho _ _  = throwIO (userError "setEcho on HaNS socket.")
+  getEcho _    = throwIO (userError "getEcho on HaNS socket.")
   setRaw _ _   = return ()
   devType _    = return Stream
   dup bs       = addRef bs >> return bs
-  dup2 _ _     = throw (userError "dup2 on HaNS socket.")
+  dup2 _ _     = throwIO (userError "dup2 on HaNS socket.")
 
 instance RawIO BufferedSocket where
   read sock dptr sz =

@@ -69,23 +69,23 @@ getConnectedHansSocket sock forWrite =
   do state <- readMVar (sockState sock)
      case state of
        SockConnected s c -> checkDone c forWrite >> return s
-       _                 -> throw (userError "Socket not in connected state.")
+       _                 -> throwIO (userError "Socket not in connected state.")
  where
   checkDone Nothing _ =
            return ()
   checkDone (Just ShutdownReceive) x
     | x `elem` [ForRead, ForBoth] =
-           throw (userError "Read on Socket set shutdown/receive.")
+           throwIO (userError "Read on Socket set shutdown/receive.")
     | otherwise =
            return ()
   checkDone (Just ShutdownSend) x
     | x `elem` [ForWrite, ForBoth] =
-           throw (userError "Write on Socket set shutdown/send.")
+           throwIO (userError "Write on Socket set shutdown/send.")
     | otherwise =
            return ()
   checkDone (Just ShutdownBoth) x
     | x /= ForNeither =
-           throw (userError "Read or write on shutdown socket.")
+           throwIO (userError "Read or write on shutdown socket.")
     | otherwise =
            return ()
 
@@ -94,14 +94,14 @@ getBoundUdpPort sock =
   do state <- readMVar (sockState sock)
      case state of
        SockBoundUdp mp _ -> return (sockNStack sock, mp)
-       _                 -> throw (userError "Socket not bound to UDP.")
+       _                 -> throwIO (userError "Socket not bound to UDP.")
 
 getNextUdpPacket :: Socket -> IO (ByteString, SockAddr)
 getNextUdpPacket sock =
   do state <- readMVar (sockState sock)
      case state of
        SockBoundUdp _ c -> readChan c
-       _                -> throw (userError "Socket not bound to UDP.")
+       _                -> throwIO (userError "Socket not bound to UDP.")
 
 instance Eq Socket where
   a == b = sockIdent a == sockIdent b
@@ -152,13 +152,13 @@ socket AF_INET Datagram 17 =
      sockIdent  <- getNextSockIdent
      return Socket { .. }
 socket _       _        _  =
-  throw (userError "ERROR: Unsupported socket options.")
+  throwIO (userError "ERROR: Unsupported socket options.")
 
 connect :: Socket -> SockAddr -> IO ()
 connect sock (SockAddrInet (PortNum port) addr) =
   do state <- takeMVar (sockState sock)
      unless (state == SockInitialTcp) $
-       throw (userError "Attempt to connect() on a non-TCP socket.")
+       throwIO (userError "Attempt to connect() on a non-TCP socket.")
      let dest  = convertFromWord32 addr
          dport = fromIntegral port
          ns    = sockNStack sock
@@ -166,7 +166,7 @@ connect sock (SockAddrInet (PortNum port) addr) =
                putMVar (sockState sock) (SockConnected hsock Nothing))
            (\ e ->
              do putMVar (sockState sock) state
-                throw (e :: SomeException))
+                throwIO (e :: SomeException))
 
 bind :: Socket -> SockAddr -> IO ()
 bind sock (SockAddrInet (PortNum port) addr) =
@@ -184,7 +184,7 @@ bind sock (SockAddrInet (PortNum port) addr) =
             putMVar (sockState sock) (SockBoundTcp addr' port')
        _ ->
          do putMVar (sockState sock) state
-            throw (userError "Bind called on incompatible socket.")
+            throwIO (userError "Bind called on incompatible socket.")
  where
   udpHandler :: Chan (ByteString, SockAddr) -> IP4 -> NS.UdpPort -> ByteString -> IO ()
   udpHandler chan addr port bstr =
@@ -200,7 +200,7 @@ listen sock _ =
          do nsock <- NS.listen (sockNStack sock) addr port
             putMVar (sockState sock) (SockListening nsock)
        _ ->
-         throw (userError "Listen called on unbound or non-TCP socket.")
+         throwIO (userError "Listen called on unbound or non-TCP socket.")
 
 accept :: Socket -> IO (Socket, SockAddr)
 accept sock =

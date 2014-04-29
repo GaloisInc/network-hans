@@ -110,7 +110,7 @@ defaultHints  = AddrInfo [] AF_UNSPEC NoSocketType defaultProtocol undefined und
 getAddrInfo :: Maybe AddrInfo -> Maybe HostName -> Maybe ServiceName ->
                IO [AddrInfo]
 getAddrInfo _ Nothing Nothing =
-  throw (userError "Cannot pass two Nothings to getAddrInfo")
+  throwIO (userError "Cannot pass two Nothings to getAddrInfo")
 getAddrInfo Nothing mhn msn =
   getAddrInfo (Just defaultHints) mhn msn
 getAddrInfo mai Nothing msn =
@@ -141,11 +141,11 @@ data NameInfoFlag = NI_DGRAM | NI_NAMEREQD | NI_NOFQDN
 getNameInfo :: [NameInfoFlag] -> Bool -> Bool -> SockAddr ->
                IO (Maybe HostName, Maybe ServiceName)
 getNameInfo _ _ _ _ =
-  throw (userError "FIXME: ERROR: network-hans does not support getNameInfo")
+  throwIO (userError "FIXME: ERROR: network-hans does not support getNameInfo")
 
 socketPair :: Family -> SocketType -> ProtocolNumber -> IO (Socket, Socket)
 socketPair _ _ _  =
-  throw (userError "FIXME: ERROR: network-hans does not support socketPair")
+  throwIO (userError "FIXME: ERROR: network-hans does not support socketPair")
 
 getPeerName :: Socket -> IO SockAddr
 getPeerName s =
@@ -163,7 +163,7 @@ getSocketName s =
 
 getPeerCred :: Socket -> IO (CUInt, CUInt, CUInt)
 getPeerCred _ =
-  throw (userError "getPeerCred not supported on HaNS")
+  throwIO (userError "getPeerCred not supported on HaNS")
 
 socketPort :: Socket -> IO PortNumber
 socketPort sock =
