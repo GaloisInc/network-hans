@@ -24,6 +24,7 @@ library
         extensions:                     DeriveDataTypeable,
                                         ForeignFunctionInterface,
                                         GeneralizedNewtypeDeriving,
+                                        MultiWayIf,
                                         RecordWildCards,
                                         ScopedTypeVariables
         exposed-modules:
