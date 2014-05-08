@@ -1,5 +1,6 @@
 module Network.Socket(
          Socket
+       , SocketType(..)
        , Family(..)
        , isSupportedFamily
        , SockAddr(..)

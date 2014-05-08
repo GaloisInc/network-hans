@@ -35,6 +35,7 @@ library
                                         Network.Socket.Internal,
                                         Network.URI
         other-modules:
+                                        Hans.Socket.Handle,
                                         Network.BSD.ServiceDB
 
         build-depends:
