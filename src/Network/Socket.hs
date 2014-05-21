@@ -9,7 +9,7 @@ module Network.Socket(
        , PortNumber(..)
        , HostName
        , ServiceName
-       , AddrInfo
+       , AddrInfo(..)
        , AddrInfoFlag(..)
        , addrInfoFlagImplemented
        , defaultHints
@@ -46,6 +46,7 @@ module Network.Socket(
        , isReadable
        , isWritable
        , SocketOption(..)
+       , defaultProtocol
        , isSupportedSocketOption
        , getSocketOption
        , setSocketOption
