@@ -1,5 +1,5 @@
 name:           network-hans
-version:        0.1
+version:        0.2
 cabal-version:  >= 1.8
 license:        BSD3
 license-file:   LICENSE
@@ -32,8 +32,8 @@ library
                                         Network.Socket,
                                         Network.Socket.ByteString,
                                         Network.Socket.ByteString.Lazy,
-                                        Network.Socket.Internal,
-                                        Network.URI
+                                        Network.Socket.Internal
+
         other-modules:
                                         Hans.Socket.Handle,
                                         Network.BSD.ServiceDB
