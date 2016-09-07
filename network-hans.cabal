@@ -1,5 +1,5 @@
 name:           network-hans
-version:        0.2
+version:        2.6.3.1
 cabal-version:  >= 1.8
 license:        BSD3
 license-file:   LICENSE
@@ -20,6 +20,7 @@ source-repository head
         location:       git://github.com/GaloisInc/network-hans.git
 
 library
+        ghc-options:                    -Wall
         hs-source-dirs:                 src
         extensions:                     DeriveDataTypeable,
                                         ForeignFunctionInterface,
@@ -35,13 +36,13 @@ library
                                         Network.Socket.Internal
 
         other-modules:
-                                        Hans.Socket.Handle,
-                                        Network.BSD.ServiceDB
+                                        Network.BSD.ServiceDB,
+                                        Network.Socket.Types
 
         build-depends:
-                                        base       >= 4.0 && < 5.0,
-                                        bytestring >= 0.9 && < 0.12,
-                                        hans       >= 2.4 && < 2.8,
-                                        parsec     >= 3.0 && < 4.0
+                                        base       >= 4.0   && < 5.0,
+                                        bytestring >= 0.9   && < 0.12,
+                                        hans       >= 3.0.1 && < 4.0,
+                                        parsec     >= 3.0   && < 4.0
 
 

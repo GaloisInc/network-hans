@@ -6,17 +6,18 @@ module Network.Socket.ByteString.Lazy(
        )
  where
 
-import Data.ByteString.Lazy(ByteString)
+import           Data.ByteString.Lazy(ByteString)
 import qualified Data.ByteString.Lazy as L
-import Data.Int
-import qualified Hans.NetworkStack as NS
-import Network.Socket.Internal
-import Prelude hiding (getContents)
-import System.IO.Unsafe(unsafeInterleaveIO)
+import           Data.Int(Int64)
+import           Hans.Socket(DataSocket(..))
+import           Network.Socket.Types(Socket, Direction(..), withTcpSocket)
+import           Prelude hiding (getContents)
+import           System.IO.Unsafe(unsafeInterleaveIO)
 
 send :: Socket -> ByteString -> IO Int64
-send sock bstr = getConnectedHansSocket sock ForWrite >>=
-  (\ s -> NS.sendBytes s bstr)
+send sock bstr =
+  withTcpSocket sock ForWrite $ \ tcps ->
+    fromIntegral `fmap` sWrite tcps bstr
 
 sendAll :: Socket -> ByteString -> IO ()
 sendAll sock bstr
@@ -37,6 +38,7 @@ getContents socket = lazyRead
                   return (bstr `L.append` next)
 
 recv :: Socket -> Int64 -> IO ByteString
-recv sock amt = getConnectedHansSocket sock ForRead >>=
-  (\ s -> NS.recvBytes s amt)
+recv sock amt =
+  withTcpSocket sock ForRead $ \ tcps ->
+    sRead tcps (fromIntegral amt)
 

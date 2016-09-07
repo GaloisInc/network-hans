@@ -1,5 +1,5 @@
 module Network.BSD(
-         HostName(..)
+         HostName
        , getHostName
        , HostEntry(..)
        , getHostByName
@@ -19,6 +19,7 @@ module Network.BSD(
        , setServiceEntry
        , endServiceEntry
        , ProtocolName
+       , ProtocolNumber
        , ProtocolEntry(..)
        , getProtocolByName
        , getProtocolByNumber
@@ -36,15 +37,17 @@ module Network.BSD(
        , setNetworkEntry
        , getNetworkEntry
        , endNetworkEntry
+       , ifNameToIndex
        )
  where
 
-import Control.Exception
-import Data.Typeable
-import Foreign.C.Types
-import Hans.Address.IP4
-import Network.BSD.ServiceDB
-import Network.Socket.Internal
+import Control.Exception(throw)
+import Data.Typeable(Typeable)
+import Foreign.C.Types(CInt, CULong)
+import Hans.IP4(packIP4)
+import Network.BSD.ServiceDB(ServiceEntry(..), ServiceName, serviceDB)
+import Network.Socket.Internal(PortNumber(..), HostAddress, Family(..))
+import Network.Socket.Types(fromIP4)
 
 type HostName = String
 
@@ -118,6 +121,10 @@ setServiceEntry _ = return ()
 endServiceEntry :: IO ()
 endServiceEntry  = return ()
 
+type ProtocolName = String
+
+type ProtocolNumber = CInt
+
 data ProtocolEntry = ProtocolEntry {
     protoName    :: ProtocolName
   , protoAliases :: [ProtocolName]
@@ -177,10 +184,10 @@ data NetworkEntry = NetworkEntry {
 networkDB :: [NetworkEntry]
 networkDB  = [
     NetworkEntry "default"    [] AF_INET 0
-  , NetworkEntry "loopback"   [] AF_INET (convertToWord32' (IP4 127 0 0 0))
-  , NetworkEntry "link-local" [] AF_INET (convertToWord32' (IP4 169 254 0 0))
+  , NetworkEntry "loopback"   [] AF_INET (fromIP4' (packIP4 127 0 0 0))
+  , NetworkEntry "link-local" [] AF_INET (fromIP4' (packIP4 169 254 0 0))
   ]
- where convertToWord32' = fromIntegral . convertToWord32
+ where fromIP4' = fromIntegral . fromIP4
 
 getNetworkByName :: NetworkName -> IO NetworkEntry
 getNetworkByName nm = return (go networkDB)
@@ -209,3 +216,6 @@ getNetworkEntry = return (head networkDB)
 
 endNetworkEntry :: IO ()
 endNetworkEntry = return ()
+
+ifNameToIndex :: String -> IO (Maybe Int)
+ifNameToIndex _ = return Nothing
